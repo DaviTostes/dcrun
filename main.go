@@ -16,6 +16,9 @@ type runner struct {
 	detect  func(dir string) bool
 	command string
 	args    []string
+	// passSep: insert "--" before user-passed flags so the underlying tool
+	// forwards them to the script/binary instead of consuming them itself.
+	passSep bool
 }
 
 func hasFile(dir, name string) bool {
@@ -59,10 +62,10 @@ func hasLuaEntry(dir string) (string, bool) {
 
 func detectRunner(dir string) (*runner, error) {
 	if hasFile(dir, "bun.lockb") || hasFile(dir, "bun.lock") {
-		return &runner{name: "Bun", command: "bun", args: []string{"run", "dev"}}, nil
+		return &runner{name: "Bun", command: "bun", args: []string{"run", "dev"}, passSep: true}, nil
 	}
 	if hasFile(dir, "pnpm-lock.yaml") {
-		return &runner{name: "pnpm", command: "pnpm", args: []string{"dev"}}, nil
+		return &runner{name: "pnpm", command: "pnpm", args: []string{"dev"}, passSep: true}, nil
 	}
 	if hasFile(dir, "yarn.lock") {
 		return &runner{name: "Yarn", command: "yarn", args: []string{"dev"}}, nil
@@ -71,13 +74,13 @@ func detectRunner(dir string) (*runner, error) {
 		return &runner{name: "Deno", command: "deno", args: []string{"task", "dev"}}, nil
 	}
 	if hasFile(dir, "package.json") {
-		return &runner{name: "NodeJS", command: "npm", args: []string{"run", "dev"}}, nil
+		return &runner{name: "NodeJS", command: "npm", args: []string{"run", "dev"}, passSep: true}, nil
 	}
 	if hasFile(dir, "go.mod") {
 		return &runner{name: "Go", command: "go", args: []string{"run", "."}}, nil
 	}
 	if hasFile(dir, "Cargo.toml") {
-		return &runner{name: "Rust", command: "cargo", args: []string{"run"}}, nil
+		return &runner{name: "Rust", command: "cargo", args: []string{"run"}, passSep: true}, nil
 	}
 	if hasFile(dir, "uv.lock") {
 		return &runner{name: "Python (uv)", command: "uv", args: []string{"run", "python", "main.py"}}, nil
@@ -89,7 +92,7 @@ func detectRunner(dir string) (*runner, error) {
 		return &runner{name: "Django", command: "python", args: []string{"manage.py", "runserver"}}, nil
 	}
 	if hasGlob(dir, "*.csproj") || hasGlob(dir, "*.sln") || hasGlob(dir, "*.fsproj") {
-		return &runner{name: "Dotnet", command: "dotnet", args: []string{"run"}}, nil
+		return &runner{name: "Dotnet", command: "dotnet", args: []string{"run"}, passSep: true}, nil
 	}
 	if entry, ok := hasLuaEntry(dir); ok {
 		return &runner{name: "Lua", command: "lua", args: []string{entry}}, nil
@@ -118,9 +121,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("dcrun: %s detected, running: %s %v\n", r.name, r.command, r.args)
+	userArgs := os.Args[1:]
+	if len(userArgs) > 0 && userArgs[0] == "--" {
+		userArgs = userArgs[1:]
+	}
 
-	cmd := exec.Command(r.command, r.args...)
+	finalArgs := append([]string{}, r.args...)
+	if len(userArgs) > 0 {
+		if r.passSep {
+			finalArgs = append(finalArgs, "--")
+		}
+		finalArgs = append(finalArgs, userArgs...)
+	}
+
+	fmt.Printf("dcrun: %s detected, running: %s %v\n", r.name, r.command, finalArgs)
+
+	cmd := exec.Command(r.command, finalArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
