@@ -68,7 +68,7 @@ func detectRunner(dir string) (*runner, error) {
 		return &runner{name: "pnpm", command: "pnpm", args: []string{"dev"}, passSep: true}, nil
 	}
 	if hasFile(dir, "yarn.lock") {
-		return &runner{name: "Yarn", command: "yarn", args: []string{"dev"}}, nil
+		return &runner{name: "Yarn", command: "yarn", args: []string{"dev"}, passSep: true}, nil
 	}
 	if hasFile(dir, "deno.json") || hasFile(dir, "deno.jsonc") || hasFile(dir, "deno.lock") {
 		return &runner{name: "Deno", command: "deno", args: []string{"task", "dev"}}, nil
