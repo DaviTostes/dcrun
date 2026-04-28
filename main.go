@@ -61,6 +61,9 @@ func hasLuaEntry(dir string) (string, bool) {
 }
 
 func detectRunner(dir string) (*runner, error) {
+	if hasFile(dir, "Taskfile.yml") {
+		return &runner{name: "Task", command: "task", args: []string{"dev"}, passSep: true}, nil
+	}
 	if hasFile(dir, "bun.lockb") || hasFile(dir, "bun.lock") {
 		return &runner{name: "Bun", command: "bun", args: []string{"run", "dev"}, passSep: true}, nil
 	}
